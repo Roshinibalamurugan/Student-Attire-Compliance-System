@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Dress Code Compliance</title>
+    <!-- <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        form { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, button { padding: 10px; margin-bottom: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; }
+        button { background-color: #4CAF50; color: white; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #video { display: none; width: 100%; max-width: 640px; margin: 20px auto; border: 1px solid #ddd; }
+        #canvas { display: none; }
+        #capture-btn { display: none; }
+        #results { margin-top: 20px; padding: 10px; border-radius: 4px; display: none; }
+        .pass { background-color: #d4edda; color: #155724; }
+        .fail { background-color: #f8d7da; color: #721c24; }
+        .result-item { margin: 5px 0; }
+        #back-btn { display: none; margin-top: 10px; }
+    </style> -->
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: linear-gradient(to right, #dbeafe, #f0f9ff); /* Soft blue gradient */
+    }
+
+    .container {
+        max-width: 800px;
+        margin: auto;
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    h1 {
+        text-align: center;
+        color: #1e3a8a; /* Deep blue */
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #1e293b; /* Slate dark */
+    }
+
+    select,
+    button {
+        padding: 10px;
+        margin-bottom: 10px;
+        width: 100%;
+        border: 1px solid #cbd5e1; 
+        border-radius: 6px;
+    }
+
+    select {
+        background-color: #f8fafc; 
+    }
+
+    button {
+        background-color: #2563eb; /* Blue button */
+        color: white;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+
+    button:hover {
+        background-color: #1d4ed8; /* Darker blue */
+    }
+
+    #video {
+        display: none;
+        width: 100%;
+        max-width: 640px;
+        margin: 20px auto;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+    }
+
+    #canvas {
+        display: none;
+    }
+
+    #results {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 8px;
+        display: none;
+    }
+
+    .pass {
+        background-color: #dcfce7;
+        color: #14532d;
+    }
+
+    .fail {
+        background-color: #fee2e2;
+        color: #7f1d1d;
+    }
+
+    .result-item {
+        margin: 6px 0;
+    }
+
+    #back-btn {
+        display: none;
+        margin-top: 10px;
+        background-color: #64748b; /* Cool grey */
+        color: white;
+    }
+
+    #back-btn:hover {
+        background-color: #475569; /* Darker grey */
+    }
+</style>
+
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Dress Code Compliance</h1>
+        <form id="setup-form">
+            <label for="mode">Select Mode:</label>
+            <select id="mode" name="mode">
+                <option value="Normal Day">Normal Day</option>
+                <option value="Uniform Day">Uniform Day</option>
+                <option value="Lab Day">Lab Day</option>
+            </select>
+            <label for="gender">Select Gender:</label>
+            <select id="gender" name="gender">
+                <option value="Boy">Boy</option>
+                <option value="Girl">Girl</option>
+            </select>
+            <button type="submit">Start Detection</button>
+        </form>
+        <video id="video" autoplay></video>
+        <canvas id="canvas"></canvas>
+        <button id="capture-btn">Capture</button>
+        <div id="results"></div>
+        <button id="back-btn">Back to Options</button>
+        <div id="records-section" style="margin-top: 20px;">
+            <h2>Recent Records</h2>
+            <label for="date-picker">Select Date:</label>
+            <input type="date" id="date-picker" style="margin-bottom: 10px; padding: 5px;">
+            <div id="drop-zone" style="border: 2px dashed #ccc; padding: 20px; text-align: center; margin-bottom: 20px;">
+                Drag and drop a CSV file here to view records based on selected date
+            </div>
+            <table id="records-table" border="1" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Gender</th>
+                        <th>Mode</th>
+                        <th>Beard</th>
+                        <th>ID</th>
+                        <th>Uniform</th>
+                        <th>Tucked</th>
+                        <th>Labcoat</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody id="records-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        let stream;
+        let mode, gender;
+
+        document.getElementById('setup-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            mode = document.getElementById('mode').value;
+            gender = document.getElementById('gender').value;
+            startWebcam();
+        });
+
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video').srcObject = stream;
+                document.getElementById('video').style.display = 'block';
+                document.getElementById('capture-btn').style.display = 'block';
+                document.getElementById('setup-form').style.display = 'none';
+            } catch (err) {
+                alert('Error accessing webcam: ' + err.message);
+            }
+        }
+
+        document.getElementById('capture-btn').addEventListener('click', function() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg');
+            processImage(imageData);
+        });
+
+        async function processImage(imageData) {
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData, mode: mode, gender: gender })
+            });
+            const result = await response.json();
+            displayResults(result);
+        }
+
+        function displayResults(result) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.className = result.all_pass ? 'pass' : 'fail';
+            let html = '<h2>Detection Results</h2>';
+            html += '<div class="result-item">🪪 ' + result.id_text + '</div>';
+            if (result.uniform_text) html += '<div class="result-item">👔 ' + result.uniform_text + '</div>';
+            if (result.tuckin_text) html += '<div class="result-item">👕 ' + result.tuckin_text + '</div>';
+            if (result.beard_text) html += '<div class="result-item">🧔 ' + result.beard_text + '</div>';
+            if (result.labcoat_text) html += '<div class="result-item">🧥 ' + result.labcoat_text + '</div>';
+            html += '<div class="result-item"><strong>' + result.status_text + '</strong></div>';
+            if (result.image_path) html += '<div class="result-item">💾 Saved: ' + result.image_path + '</div>';
+            resultsDiv.innerHTML = html;
+            document.getElementById('back-btn').style.display = 'block';
+            loadRecords(); // Update records after detection
+        }
+
+        document.getElementById('back-btn').addEventListener('click', function() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('back-btn').style.display = 'none';
+            document.getElementById('video').style.display = 'none';
+            document.getElementById('capture-btn').style.display = 'none';
+            document.getElementById('setup-form').style.display = 'block';
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        });
+
+        const dropZone = document.getElementById('drop-zone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#4CAF50';
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.borderColor = '#ccc';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '#ccc';
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.csv')) {
+                const file = files[0];
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const csv = event.target.result;
+                    displayCSV(csv);
+                };
+                reader.readAsText(file);
+            } else {
+                alert('Please drop a CSV file.');
+            }
+        });
+
+        function displayCSV(csv) {
+            const lines = csv.split('\n');
+            const headers = lines[0].split(',');
+            const tbody = document.getElementById('records-body');
+            tbody.innerHTML = '';
+            const selectedDate = document.getElementById('date-picker').value;
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const values = lines[i].split(',');
+                if (selectedDate && values[0] !== selectedDate) continue; // Filter by selected date
+                let row = '<tr>';
+                for (let j = 0; j < headers.length; j++) {
+                    row += '<td>' + (values[j] || '') + '</td>';
+                }
+                row += '</tr>';
+                tbody.innerHTML += row;
+            }
+        }
+
+        loadRecords();
+        function loadRecords(date = null) {
+            const url = date ? `/records?date=${date}` : '/records';
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('records-body');
+                    tbody.innerHTML = '';
+                    data.forEach(record => {
+                        let row = '<tr>';
+                        row += '<td>' + record.Date + '</td>';
+                        row += '<td>' + record.Time + '</td>';
+                        row += '<td>' + record.Gender + '</td>';
+                        row += '<td>' + record.Mode + '</td>';
+                        row += '<td>' + (record['Beard Detected'] || record.Beard || '') + '</td>';
+                        row += '<td>' + (record['ID Card Detected'] || record.ID || '') + '</td>';
+                        row += '<td>' + (record['Uniform Detected'] || record.Uniform || '') + '</td>';
+                        row += '<td>' + (record['Shirt Tucked'] || record.Tucked || '') + '</td>';
+                        row += '<td>' + (record['Labcoat Detected'] || record.Labcoat || '') + '</td>';
+                        row += '<td>' + (record['Final Result'] || record.Result || '') + '</td>';
+                        row += '</tr>';
+                        tbody.innerHTML += row;
+                    });
+                });
+        }
+
+        document.getElementById('date-picker').addEventListener('change', function() {
+            const selectedDate = this.value;
+            if (selectedDate) {
+                loadRecords(selectedDate);
+            }
+        });
+    </script>
+</body>
+</html>
